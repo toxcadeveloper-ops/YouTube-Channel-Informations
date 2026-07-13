@@ -47,3 +47,7 @@ const server = http.createServer(async (req, res) => {
     }
 });
 server.listen(3000);
+// index.js
+server.on('request', (req, res) => {
+    console.log("Roblox'dan so'rov keldi! URL:", req.url); // Bu Render logida chiqishi shart!
+});
