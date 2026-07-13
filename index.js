@@ -57,3 +57,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(process.env.PORT || 3000);
+
+// index.js ichida, if (req.url.startsWith('/verify')) dan keyin:
+console.log("Roblox'dan kelgan so'rov:", req.url); // Mana shu yozuv Render logida chiqishi shart!
