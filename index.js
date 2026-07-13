@@ -1,26 +1,23 @@
 const http = require('http');
 const https = require('https');
-const url = require('url');
 
-const API_KEY = 'SIZNING_API_KEYINGIZ'; // Bu yerga o'z kalitingizni qo'ying
+const API_KEY = process.env.API_KEY; // Render'da Environment Variable sifatida qo'shing
 
 const server = http.createServer((req, res) => {
-    // Faqat /verify yo'li uchun javob beramiz
     if (req.url.startsWith('/verify')) {
-        const query = url.parse(req.url, true).query;
-        let handle = query.handle;
-        const userCode = query.code;
+        // Yangi URL API dan foydalanamiz
+        const myUrl = new URL(req.url, `http://${req.headers.host}`);
+        const handle = myUrl.searchParams.get('handle');
+        const userCode = myUrl.searchParams.get('code');
 
         if (!handle || !userCode) {
             res.end(JSON.stringify({ status: "error", message: "Params missing" }));
             return;
         }
 
-        // Handle ni tozalash
-        handle = handle.trim().replace('@', '');
-
-        // 1. YouTube API orqali kanalni qidirish
-        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&maxResults=1&key=${API_KEY}`;
+        const cleanHandle = handle.trim().replace('@', '');
+        // encodeURIComponent barcha maxsus belgilarni (bo'sh joy, @ va h.k.) xavfsiz qiladi
+        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(cleanHandle)}&maxResults=1&key=${API_KEY}`;
         
         https.get(searchUrl, (apiRes) => {
             let data = '';
@@ -34,8 +31,7 @@ const server = http.createServer((req, res) => {
                     }
 
                     const channelId = search.items[0].snippet.channelId;
-
-                    // 2. Kanal bio'sini olish
+                    
                     https.get(`https://www.googleapis.com/youtube/v3/channels?part=snippet&id=${channelId}&key=${API_KEY}`, (chRes) => {
                         let chData = '';
                         chRes.on('data', (c) => chData += c);
@@ -43,23 +39,20 @@ const server = http.createServer((req, res) => {
                             const channel = JSON.parse(chData);
                             const bio = channel.items[0]?.snippet?.description || "";
 
-                            // 3. Kodni tekshirish
                             if (bio.includes(userCode)) {
-                                res.end(JSON.stringify({ status: "success", message: "Kanal tasdiqlandi!" }));
+                                res.end(JSON.stringify({ status: "success", message: "Tasdiqlandi!" }));
                             } else {
                                 res.end(JSON.stringify({ status: "error", message: "Kodni bio-dan topa olmadim." }));
                             }
                         });
                     });
                 } catch (e) {
-                    res.end(JSON.stringify({ status: "error", message: "JSON parse xatosi" }));
+                    res.end(JSON.stringify({ status: "error", message: "API Error" }));
                 }
             });
         }).on('error', (err) => {
             res.end(JSON.stringify({ status: "error", message: err.message }));
         });
-    } else {
-        res.end('Server ishlamoqda...');
     }
 });
 
