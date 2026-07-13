@@ -17,7 +17,8 @@ const server = http.createServer((req, res) => {
 
         const cleanHandle = handle.trim().replace('@', '');
         // encodeURIComponent barcha maxsus belgilarni (bo'sh joy, @ va h.k.) xavfsiz qiladi
-        const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(cleanHandle)}&maxResults=1&key=${API_KEY}`;
+       // index.js ichida
+const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=channel&q=${encodeURIComponent(handle)}&key=${API_KEY}`;
         
         https.get(searchUrl, (apiRes) => {
             let data = '';
