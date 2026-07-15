@@ -20,19 +20,20 @@ function buildChannelQuery(raw) {
 
     if (input.includes("youtube.com")) {
         const handleMatch = input.match(/@([\w\-]+)/);
-        if (handleMatch) { console.log("[QUERY] rejim: forHandle (handle)"); return `forHandle=${encodeURIComponent(handleMatch[1])}`; }
+        if (handleMatch) { const h = "@" + handleMatch[1]; console.log("[QUERY] rejim: forHandle (handle)"); return `forHandle=${encodeURIComponent(h)}`; }
         const chanMatch = input.match(/\/channel\/([\w\-]+)/);
         if (chanMatch) { console.log("[QUERY] rejim: id (channel)"); return `id=${encodeURIComponent(chanMatch[1])}`; }
         const cMatch = input.match(/\/(c|user)\/([\w\-]+)/);
-        if (cMatch) { console.log("[QUERY] rejim: forHandle (c/user)"); return `forHandle=${encodeURIComponent(cMatch[2])}`; }
+        if (cMatch) { const h = "@" + cMatch[2]; console.log("[QUERY] rejim: forHandle (c/user)"); return `forHandle=${encodeURIComponent(h)}`; }
     }
 
-    if (input.startsWith("@")) { console.log("[QUERY] rejim: forHandle (@)"); return `forHandle=${encodeURIComponent(input.slice(1))}`; }
+    if (input.startsWith("@")) { console.log("[QUERY] rejim: forHandle (@)"); return `forHandle=${encodeURIComponent(input)}`; }
     if (input.startsWith("UC") && input.length > 18) { console.log("[QUERY] rejim: id (UC)"); return `id=${encodeURIComponent(input)}`; }
 
-    console.log("[QUERY] rejim: forHandle (default)");
-    return `forHandle=${encodeURIComponent(input)}`;
+    console.log("[QUERY] rejim: forHandle (default, @ qo'shildi)");
+    return `forHandle=${encodeURIComponent("@" + input)}`;
 }
+
 
 const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
