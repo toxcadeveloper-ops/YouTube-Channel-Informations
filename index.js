@@ -4,38 +4,31 @@ const axios = require('axios');
 
 const API_KEY = process.env.API_KEY;
 
-/ Kiruvchi matndan qanday qidirish kerakligini aniqlaymiz:
-/  - @username yoki youtube.com/@username -> forHandle
-/  - youtube.com/channel/UCxxxx -> id (kanal ID)
-/  - UCxxxx (kanal ID) -> id
-/  - oddiy so'z -> forHandle (handle deb hisoblaymiz)
-function buildChannelUrl(raw) {  
+/ Kiruvchi matndan qanday qidirish kerakligini ajratamiz:
+/   @username / youtube.com/@username  -> forHandle
+/   UCxxxx (kanal ID) / /channel/UCxxx  -> id
+/   oddiy so'z                           -> forHandle (handle deb hisoblaymiz)
+function buildChannelQuery(raw) {
     let input = (raw || "").trim();
 
     if (input.includes("youtube.com")) {
-        -- @handle
-        local h = input:match("@([%w%-_]+)")
-        if h then return "forHandle=" .. encodeURIComponent(h) end
-        -- /channel/UCxxxx
-        local cid = input:match("/channel/([%w%-_]+)")
-        if cid then return "id=" .. encodeURIComponent(cid) end
-        -- /c/name yoki /user/name (eski) -> handle sifatida
-        local c = input:match("/c/([%w%-_]+)") or input:match("/user/([%w%-_]+)")
-        if c then return "forHandle=" .. encodeURIComponent(c) end
+        const handleMatch = input.match(/@([\w\-]+)/);
+        if (handleMatch) return `forHandle=${encodeURIComponent(handleMatch[1])}`;
+        const chanMatch = input.match(/\/channel\/([\w\-]+)/);
+        if (chanMatch) return `id=${encodeURIComponent(chanMatch[1])}`;
+        const cMatch = input.match(/\/(c|user)\/([\w\-]+)/);
+        if (cMatch) return `forHandle=${encodeURIComponent(cMatch[2])}`;
     }
 
-    -- @ bilan boshlansa
     if (input.startsWith("@")) {
-        return "forHandle=" .. encodeURIComponent(input.slice(1));
+        return `forHandle=${encodeURIComponent(input.slice(1))}`;
     }
 
-    -- Kanal ID (UC bilan boshlanadi) bo'lsa
-    if (input.startsWith("UC") && input.length > 10) {
-        return "id=" .. encodeURIComponent(input);
+    if (input.startsWith("UC") && input.length > 18) {
+        return `id=${encodeURIComponent(input)}`;
     }
 
-    -- Aks holda handle deb qabul qilamiz
-    return "forHandle=" .. encodeURIComponent(input);
+    return `forHandle=${encodeURIComponent(input)}`;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -52,8 +45,8 @@ const server = http.createServer(async (req, res) => {
         }
 
         try {
-            const channelQuery = buildChannelUrl(channelId);
-            const channelUrl = `https:/www.googleapis.com/youtube/v3/channels?part=snippet,statistics&${channelQuery}&key=${API_KEY}`;
+            const query = buildChannelQuery(channelId);
+            const channelUrl = `https:/www.googleapis.com/youtube/v3/channels?part=snippet,statistics&${query}&key=${API_KEY}`;
             const channelRes = await axios.get(channelUrl);
             const channelData = channelRes.data;
 
@@ -62,13 +55,12 @@ const server = http.createServer(async (req, res) => {
             }
 
             const channel = channelData.items[0];
-            const description = channel.snippet.description;
+            const description = channel.snippet.description || "";
 
             if (!description.includes(code)) {
                 return res.end(JSON.stringify({ status: "error", message: "Kod kanal tavsifida topilmadi!" }));
             }
 
-            / Oxirgi video statistikasi (avvalgidek)
             const searchUrl = `https:/www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel.id}&maxResults=1&order=date&type=video&key=${API_KEY}`;
             const searchRes = await axios.get(searchUrl);
             const searchData = searchRes.data;
@@ -86,7 +78,7 @@ const server = http.createServer(async (req, res) => {
             const videoUrl = `https:/www.googleapis.com/youtube/v3/videos?part=statistics&id=${latestVideoId}&key=${API_KEY}`;
             const videoRes = await axios.get(videoUrl);
             const videoData = videoRes.data;
-            const videoStats = videoData.items[0]?.statistics || {};
+            const videoStats = (videoData.items && videoData.items[0]) ? (videoData.items[0].statistics || {}) : {};
 
             return res.end(JSON.stringify({
                 status: "success",
