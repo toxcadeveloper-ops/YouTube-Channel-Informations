@@ -131,4 +131,4 @@ const server = http.createServer(async (req, res) => {
 server.listen(3000, () => {
     console.log("[START] Server 3000-portda ishga tushdi!");
 });
-]]
+
