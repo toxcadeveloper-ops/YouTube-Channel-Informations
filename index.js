@@ -10,10 +10,6 @@ if (!API_KEY) {
     console.error("[XATO] API_KEY env topilmadi! Render Environment da API_KEY ni o'rnating.");
 }
 
-// Kiruvchi matndan qanday qidirish kerakligini ajratamiz
-//   @username / youtube.com/@username  -> forHandle
-//   UCxxxx (kanal ID) / /channel/UCxxx  -> id
-//   oddiy so'z                           -> forHandle (handle deb hisoblaymiz)
 function buildChannelQuery(raw) {
     let input = (raw || "").trim();
     console.log("[QUERY] kiruvchi matn:", input);
@@ -33,7 +29,6 @@ function buildChannelQuery(raw) {
     console.log("[QUERY] rejim: forHandle (default, @ qo'shildi)");
     return `forHandle=${encodeURIComponent("@" + input)}`;
 }
-
 
 const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -57,7 +52,8 @@ const server = http.createServer(async (req, res) => {
 
         try {
             const query = buildChannelQuery(channelId);
-            const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&${query}&key=${API_KEY}`;
+            // MUHIM: contentDetails qo'shildi -> uploads playlist olish uchun (baribar 1 birlik)
+            const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&${query}&key=${API_KEY}`;
             console.log("[YT] channel so'rovi:", channelUrl);
             const channelRes = await axios.get(channelUrl);
             const channelData = channelRes.data;
@@ -80,13 +76,29 @@ const server = http.createServer(async (req, res) => {
                 return res.end(JSON.stringify({ status: "error", message: "Kod kanal tavsifida topilmadi!" }));
             }
 
-            console.log("[YT] kod topildi, video qidirilmoqda...");
-            const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channel.id}&maxResults=1&order=date&type=video&key=${API_KEY}`;
-            const searchRes = await axios.get(searchUrl);
-            const searchData = searchRes.data;
-            console.log("[YT] search javobi: items soni =", searchData.items ? searchData.items.length : 0);
+            // ===== search.list (100 birlik) O'RNIGA uploads playlist (1 birlik) =====
+            console.log("[YT] kod topildi, oxirgi video uploads playlist orqali olinmoqda...");
+            const uploadsPlaylistId =
+                channel.contentDetails &&
+                channel.contentDetails.relatedPlaylists &&
+                channel.contentDetails.relatedPlaylists.uploads;
 
-            if (!searchData.items || searchData.items.length === 0) {
+            if (!uploadsPlaylistId) {
+                console.log("[YT] uploads playlist topilmadi, statistikasiz qaytamiz");
+                return res.end(JSON.stringify({
+                    status: "success",
+                    channelStats: channel.statistics,
+                    channelTitle: title,
+                    lastVideoStats: null
+                }));
+            }
+
+            const playlistUrl = `https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&playlistId=${uploadsPlaylistId}&maxResults=1&key=${API_KEY}`;
+            const playlistRes = await axios.get(playlistUrl);
+            const playlistData = playlistRes.data;
+            console.log("[YT] playlistItems javobi: items soni =", playlistData.items ? playlistData.items.length : 0);
+
+            if (!playlistData.items || playlistData.items.length === 0) {
                 console.log("[YT] video yo'q, statistikasiz qaytamiz");
                 return res.end(JSON.stringify({
                     status: "success",
@@ -96,7 +108,7 @@ const server = http.createServer(async (req, res) => {
                 }));
             }
 
-            const latestVideoId = searchData.items[0].id.videoId;
+            const latestVideoId = playlistData.items[0].contentDetails.videoId;
             console.log("[YT] eng yangi video:", latestVideoId);
             const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${latestVideoId}&key=${API_KEY}`;
             const videoRes = await axios.get(videoUrl);
@@ -131,4 +143,3 @@ const server = http.createServer(async (req, res) => {
 server.listen(3000, () => {
     console.log("[START] Server 3000-portda ishga tushdi!");
 });
-
